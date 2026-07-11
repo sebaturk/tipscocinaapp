@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CocinaApp — Gestión de Propinas</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- LOADING SCREEN -->
+  <div class="loading-screen" id="loading-screen">
+    <div class="loading-inner">
+      <div class="app-icon-lg">🍽️</div>
+      <div class="loading-name">CocinaApp</div>
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Conectando...</div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="app-icon">🍽️</div>
+      <div class="app-name">CocinaApp</div>
+    </div>
+    <ul class="nav-list">
+      <li class="nav-item active" data-view="dashboard">
+        <span class="nav-icon">⬡</span>
+        <span class="nav-label">Dashboard</span>
+      </li>
+      <li class="nav-item" data-view="planilla">
+        <span class="nav-icon">◫</span>
+        <span class="nav-label">Planilla</span>
+      </li>
+      <li class="nav-item" data-view="historial">
+        <span class="nav-icon">◷</span>
+        <span class="nav-label">Historial</span>
+      </li>
+      <li class="nav-item" data-view="config">
+        <span class="nav-icon">⚙</span>
+        <span class="nav-label">Configuración</span>
+      </li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="week-badge" id="sidebar-week-badge">Semana activa</div>
+      <div class="sync-indicator" id="sync-indicator">
+        <span class="sync-dot"></span>
+        <span class="sync-label">En línea</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MOBILE TOPBAR -->
+  <header class="topbar">
+    <button class="menu-btn" id="menuBtn">☰</button>
+    <span class="topbar-title">CocinaApp</span>
+    <div class="fondo-pill" id="topbar-fondo">Fondo $0</div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- ═══ DASHBOARD ═══ -->
+    <section class="view active" id="view-dashboard">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-sub" id="dash-week-label">Semana actual</p>
+        </div>
+        <button class="btn-primary" id="btn-close-week">Cerrar semana</button>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Propinas semana</div>
+          <div class="kpi-value" id="kpi-tips">$0.00</div>
+          <div class="kpi-sub">acumulado</div>
+        </div>
+        <div class="kpi-card accent">
+          <div class="kpi-label">Fondo de puntualidad</div>
+          <div class="kpi-value" id="kpi-fondo">$0.00</div>
+          <div class="kpi-sub">pendiente de reparto</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Empleados</div>
+          <div class="kpi-value" id="kpi-empleados">0</div>
+          <div class="kpi-sub">activos</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Elegibles bono</div>
+          <div class="kpi-value" id="kpi-elegibles">0</div>
+          <div class="kpi-sub">sin retardos esta semana</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Resumen semanal</h2>
+          <div class="export-btns">
+            <button class="btn-ghost" id="btn-export-csv">CSV</button>
+            <button class="btn-ghost" id="btn-print">Imprimir</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Empleado</th>
+                <th>Días</th>
+                <th>Retardos</th>
+                <th>Ganado</th>
+                <th>Descuento</th>
+                <th>Bono</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="summary-tbody"></tbody>
+            <tfoot id="summary-tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ PLANILLA ═══ -->
+    <section class="view" id="view-planilla">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Planilla</h1>
+          <p class="page-sub" id="planilla-week-label">Semana actual</p>
+        </div>
+        <div class="status-pill" id="planilla-status">Abierta</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Asistencia</h2>
+          <div class="legend">
+            <span class="legend-dot green"></span>Trabajó
+            <span class="legend-dot yellow"></span>Retardo
+            <span class="legend-dot dark"></span>Descanso
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="attendance-table">
+            <thead id="attendance-head"></thead>
+            <tbody id="attendance-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Propinas diarias</h2>
+        </div>
+        <div class="tips-grid" id="tips-grid"></div>
+      </div>
+    </section>
+
+    <!-- ═══ HISTORIAL ═══ -->
+    <section class="view" id="view-historial">
+      <div class="page-header">
+        <h1 class="page-title">Historial</h1>
+      </div>
+      <div class="history-list" id="history-list">
+        <div class="empty-state">No hay semanas cerradas aún.</div>
+      </div>
+    </section>
+
+    <!-- ═══ CONFIGURACIÓN ═══ -->
+    <section class="view" id="view-config">
+      <div class="page-header">
+        <h1 class="page-title">Configuración</h1>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Empleados</h2>
+          <button class="btn-primary btn-sm" id="btn-add-emp">+ Agregar</button>
+        </div>
+        <div class="emp-list" id="emp-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Respaldo de datos</h2>
+        </div>
+        <div class="backup-grid">
+          <button class="btn-secondary" id="btn-export-backup">⬇ Exportar respaldo</button>
+          <button class="btn-danger" id="btn-reset">⚠ Restaurar datos</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODALS -->
+  <div class="modal-overlay" id="modal-emp">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-emp-title">Agregar empleado</h3>
+        <button class="modal-close" data-modal="modal-emp">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label">Nombre</label>
+        <input type="text" class="field-input" id="emp-name-input" placeholder="Nombre del empleado" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-modal="modal-emp">Cancelar</button>
+        <button class="btn-primary" id="btn-save-emp">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-close-week">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Cerrar semana</h3>
+        <button class="modal-close" data-modal="modal-close-week">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text">Al cerrar la semana se bloquearán modificaciones, se calcularán resultados finales y se distribuirá el bono de puntualidad.</p>
+        <div class="modal-preview" id="close-week-preview"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-modal="modal-close-week">Cancelar</button>
+        <button class="btn-primary" id="btn-confirm-close">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-history">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 id="modal-history-title">Detalle de semana</h3>
+        <button class="modal-close" data-modal="modal-history">✕</button>
+      </div>
+      <div class="modal-body" id="modal-history-body"></div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-modal="modal-history">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-del-emp">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Eliminar empleado</h3>
+        <button class="modal-close" data-modal="modal-del-emp">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text">¿Eliminar a <strong id="del-emp-name"></strong>?</p>
+        <p class="modal-sub">Esta acción no se puede deshacer.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-modal="modal-del-emp">Cancelar</button>
+        <button class="btn-danger" id="btn-confirm-del-emp">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Firebase SDKs (CDN, no build step needed) -->
+  <script type="module" src="script.js"></script>
+</body>
+</html>
