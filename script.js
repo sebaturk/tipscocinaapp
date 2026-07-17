@@ -1,8 +1,9 @@
 /**
- * CocinaApp v3 — script.js
- * ✦ Login con usuario/contraseña almacenado en Firestore
- * ✦ Fecha de semana editable manualmente
- * ✦ Firebase Auth anónimo + Firestore (multi-dispositivo)
+ * CocinaApp v4 — script.js
+ * ✦ 4 niveles de retardo: worked / late25 / late50 / late100 / off
+ * ✦ Descuentos: 0% / 25% / 50% / 100%
+ * ✦ Login propio con Firebase Firestore
+ * ✦ Fecha de semana editable
  * ✦ Totalmente responsive
  */
 
@@ -10,14 +11,14 @@ import { initializeApp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getFirestore, doc, getDoc, setDoc, onSnapshot,
-  collection, query, orderBy, getDocs
+  collection, query, orderBy, getDocs,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth, signInAnonymously, onAuthStateChanged }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    FIREBASE CONFIG
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 const firebaseConfig = {
   apiKey:            'AIzaSyCdzZO2tAsGNMpuiScFzBS9wmL2B06T0ZA',
   authDomain:        'tipscocinaapp.firebaseapp.com',
@@ -26,24 +27,65 @@ const firebaseConfig = {
   messagingSenderId: '95648418171',
   appId:             '1:95648418171:web:26dd388e73d275697495de',
 };
-
 const fbApp = initializeApp(firebaseConfig);
 const db    = getFirestore(fbApp);
 const auth  = getAuth(fbApp);
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    CONSTANTES
-══════════════════════════════════════════════ */
-const DAYS        = ['L','M','X','J','V','S','D'];
-const DAY_NAMES   = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-const STATUS      = { WORKED: 'worked', LATE: 'late', OFF: 'off' };
-const STATUS_NEXT = { worked: 'late', late: 'off', off: 'worked' };
-const STATUS_ICON = { worked: '✓', late: '!', off: '—' };
-const LATE_PENALTY       = 0.25;
-const DEFAULT_EMPLOYEES  = ['Angy','Alexander','Hugo','Lili','Eider'];
-const SESSION_KEY        = 'cocinaapp_session'; // sessionStorage key
+══════════════════════════════════════════ */
+const DAYS      = ['L','M','X','J','V','S','D'];
+const DAY_NAMES = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
-/* Firestore paths */
+/**
+ * ESTADOS DE ASISTENCIA (5 niveles):
+ *   worked   → trabajó puntual         → descuento 0%
+ *   late25   → llegó +10 min tarde     → descuento 25%
+ *   late50   → llegó +30 min tarde     → descuento 50%
+ *   late100  → llegó +60 min tarde     → descuento 100%
+ *   off      → descanso / no trabaja   → no participa
+ */
+const STATUS = {
+  WORKED:   'worked',
+  LATE25:   'late25',
+  LATE50:   'late50',
+  LATE100:  'late100',
+  OFF:      'off',
+};
+
+// Ciclo de clic: worked → late25 → late50 → late100 → off → worked
+const STATUS_CYCLE = ['worked', 'late25', 'late50', 'late100', 'off'];
+
+// Icono visible dentro del dot
+const STATUS_ICON = {
+  worked:  '✓',
+  late25:  '!',
+  late50:  '!!',
+  late100: '✗',
+  off:     '—',
+};
+
+// Porcentaje de descuento por estado
+const PENALTY = {
+  worked:  0,
+  late25:  0.25,
+  late50:  0.50,
+  late100: 1.00,
+  off:     0,      // no participa, no se aplica sobre propina
+};
+
+// Etiqueta legible para tooltips / tablas
+const STATUS_LABEL = {
+  worked:  'Trabajó',
+  late25:  'Tarde +10 min (−25%)',
+  late50:  'Tarde +30 min (−50%)',
+  late100: 'Tarde +60 min (−100%)',
+  off:     'Descanso',
+};
+
+const DEFAULT_EMPLOYEES = ['Angy','Alexander','Hugo','Lili','Eider'];
+const SESSION_KEY       = 'cocinaapp_session';
+
 const PATH = {
   auth:        () => doc(db, 'app', 'auth'),
   config:      () => doc(db, 'app', 'config'),
@@ -52,9 +94,9 @@ const PATH = {
   historyDoc:  (id) => doc(db, 'history', id),
 };
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    STATE
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 let state = {
   employees:     [],
   currentWeek:   null,
@@ -68,30 +110,24 @@ let deletingEmpId = null;
 let saveDebounce  = null;
 let isLoggedIn    = false;
 
-/* ══════════════════════════════════════════════
-   LOADING HELPERS
-══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   LOADING / SYNC UI
+══════════════════════════════════════════ */
 function setLoadingText(msg) {
   const el = document.getElementById('loading-text');
   if (el) el.textContent = msg;
 }
-
 function hideLoading() {
   const el = document.getElementById('loading-screen');
   el.classList.add('hidden');
   setTimeout(() => (el.style.display = 'none'), 420);
 }
-
 function showLoading(msg = 'Cargando…') {
   const el = document.getElementById('loading-screen');
   el.style.display = 'flex';
   el.classList.remove('hidden');
   setLoadingText(msg);
 }
-
-/* ══════════════════════════════════════════════
-   SYNC UI
-══════════════════════════════════════════════ */
 function setSyncState(s) {
   const dot   = document.querySelector('.sync-dot');
   const label = document.querySelector('.sync-label');
@@ -100,24 +136,14 @@ function setSyncState(s) {
   label.textContent = s === 'online' ? 'En línea' : s === 'syncing' ? 'Guardando…' : 'Sin conexión';
 }
 
-/* ══════════════════════════════════════════════
-   ╔══════════════════╗
-   ║  AUTENTICACIÓN   ║
-   ╚══════════════════╝
-   Credenciales almacenadas en Firestore (app/auth).
-   El login de Firebase es anónimo (solo para autorizar
-   las reglas de Firestore). La validación usuario/pass
-   es propia de la app.
-══════════════════════════════════════════════ */
-
-/** Inicializa auth de Firebase y luego muestra login o app */
+/* ══════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════ */
 function initAuth() {
   setLoadingText('Conectando…');
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      // Firebase anónimo OK → verificar si hay sesión de app
-      const session = sessionStorage.getItem(SESSION_KEY);
-      if (session === 'ok') {
+      if (sessionStorage.getItem(SESSION_KEY) === 'ok') {
         await bootApp();
       } else {
         hideLoading();
@@ -127,7 +153,6 @@ function initAuth() {
       setLoadingText('Autenticando…');
       try {
         await signInAnonymously(auth);
-        // onAuthStateChanged se dispara de nuevo
       } catch (err) {
         console.error('Auth error:', err);
         hideLoading();
@@ -137,58 +162,45 @@ function initAuth() {
   });
 }
 
-/** Muestra la pantalla de login */
 function showLoginScreen() {
   document.getElementById('login-screen').classList.add('visible');
   document.getElementById('login-user').focus();
 }
-
-/** Oculta la pantalla de login */
 function hideLoginScreen() {
   document.getElementById('login-screen').classList.remove('visible');
 }
 
-/** Valida credenciales contra Firestore */
 async function doLogin() {
-  const user = document.getElementById('login-user').value.trim().toLowerCase();
-  const pass = document.getElementById('login-pass').value;
+  const user  = document.getElementById('login-user').value.trim().toLowerCase();
+  const pass  = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-error');
+  errEl.classList.remove('visible');
 
-  if (!user || !pass) {
-    showLoginError('Completa usuario y contraseña.');
-    return;
-  }
+  if (!user || !pass) { showLoginError('Completa usuario y contraseña.'); return; }
 
   const btn = document.getElementById('btn-login');
   btn.textContent = 'Verificando…';
   btn.disabled    = true;
-  errEl.classList.remove('visible');
 
   try {
-    const authSnap = await getDoc(PATH.auth());
-
-    if (!authSnap.exists()) {
-      // Primera vez: crear credenciales por defecto
+    const snap = await getDoc(PATH.auth());
+    if (!snap.exists()) {
       await setDoc(PATH.auth(), { username: 'admin', password: 'cocina2024' });
-      toast('Primera vez: usuario "admin", contraseña "cocina2024"');
-      btn.textContent = 'Entrar';
-      btn.disabled    = false;
-      return;
-    }
-
-    const creds = authSnap.data();
-    if (user === creds.username.toLowerCase() && pass === creds.password) {
-      sessionStorage.setItem(SESSION_KEY, 'ok');
-      hideLoginScreen();
-      await bootApp();
+      showLoginError('Primera vez: usuario "admin", contraseña "cocina2024"');
     } else {
-      showLoginError('Usuario o contraseña incorrectos.');
+      const c = snap.data();
+      if (user === c.username.toLowerCase() && pass === c.password) {
+        sessionStorage.setItem(SESSION_KEY, 'ok');
+        hideLoginScreen();
+        await bootApp();
+      } else {
+        showLoginError('Usuario o contraseña incorrectos.');
+      }
     }
   } catch (err) {
     console.error('Login error:', err);
     showLoginError('Error de conexión. Verifica tu internet.');
   }
-
   btn.textContent = 'Entrar';
   btn.disabled    = false;
 }
@@ -199,7 +211,6 @@ function showLoginError(msg) {
   el.classList.add('visible');
 }
 
-/** Cierra sesión */
 function doLogout() {
   if (!confirm('¿Cerrar sesión?')) return;
   sessionStorage.removeItem(SESSION_KEY);
@@ -210,54 +221,42 @@ function doLogout() {
   document.getElementById('login-pass').value = '';
 }
 
-/** Cambia contraseña */
 async function doChangePassword() {
   const oldPass     = document.getElementById('old-pass-input').value;
   const newPass     = document.getElementById('new-pass-input').value;
   const confirmPass = document.getElementById('new-pass-confirm').value;
   const errEl       = document.getElementById('change-pass-error');
-
   errEl.classList.remove('visible');
 
   if (!oldPass || !newPass || !confirmPass) {
-    errEl.textContent = 'Completa todos los campos.';
-    errEl.classList.add('visible');
-    return;
+    errEl.textContent = 'Completa todos los campos.'; errEl.classList.add('visible'); return;
   }
   if (newPass.length < 6) {
-    errEl.textContent = 'La nueva contraseña debe tener al menos 6 caracteres.';
-    errEl.classList.add('visible');
-    return;
+    errEl.textContent = 'Mínimo 6 caracteres.'; errEl.classList.add('visible'); return;
   }
   if (newPass !== confirmPass) {
-    errEl.textContent = 'Las contraseñas no coinciden.';
-    errEl.classList.add('visible');
-    return;
+    errEl.textContent = 'Las contraseñas no coinciden.'; errEl.classList.add('visible'); return;
   }
-
   try {
-    const authSnap = await getDoc(PATH.auth());
-    const creds    = authSnap.data();
+    const snap  = await getDoc(PATH.auth());
+    const creds = snap.data();
     if (oldPass !== creds.password) {
-      errEl.textContent = 'La contraseña actual es incorrecta.';
-      errEl.classList.add('visible');
-      return;
+      errEl.textContent = 'Contraseña actual incorrecta.'; errEl.classList.add('visible'); return;
     }
     await setDoc(PATH.auth(), { ...creds, password: newPass });
     closeModal('modal-change-pass');
-    document.getElementById('old-pass-input').value = '';
-    document.getElementById('new-pass-input').value = '';
-    document.getElementById('new-pass-confirm').value = '';
+    ['old-pass-input','new-pass-input','new-pass-confirm'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
     toast('Contraseña actualizada');
   } catch (err) {
-    errEl.textContent = 'Error al actualizar. Verifica tu conexión.';
-    errEl.classList.add('visible');
+    errEl.textContent = 'Error al actualizar.'; errEl.classList.add('visible');
   }
 }
 
-/* ══════════════════════════════════════════════
-   BOOT APP (después del login)
-══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════ */
 async function bootApp() {
   showLoading('Cargando datos…');
   isLoggedIn = true;
@@ -272,13 +271,12 @@ async function bootApp() {
   hideLoading();
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    FIRESTORE
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 async function initFirestore() {
   setSyncState('syncing');
 
-  // Config
   const cfgSnap = await getDoc(PATH.config());
   if (cfgSnap.exists()) {
     const d = cfgSnap.data();
@@ -290,35 +288,49 @@ async function initFirestore() {
     await saveConfig();
   }
 
-  // Semana actual
   const wkSnap = await getDoc(PATH.currentWeek());
   if (wkSnap.exists()) {
     state.currentWeek = wkSnap.data();
+    // Migrar estados legacy: 'late' → 'late25'
+    migrateWeekStatus(state.currentWeek);
   } else {
     state.currentWeek = createWeek();
     await saveCurrentWeek();
   }
 
-  // Historial
   await loadHistory();
 
-  // Listeners tiempo real
   onSnapshot(PATH.currentWeek(), snap => {
-    if (!isLoggedIn) return;
-    if (snap.exists()) { state.currentWeek = snap.data(); refreshUI(); }
+    if (!isLoggedIn || !snap.exists()) return;
+    state.currentWeek = snap.data();
+    migrateWeekStatus(state.currentWeek);
+    refreshUI();
   });
 
   onSnapshot(PATH.config(), snap => {
-    if (!isLoggedIn) return;
-    if (snap.exists()) {
-      const d = snap.data();
-      state.employees     = d.employees     ?? [];
-      state.carryoverFund = d.carryoverFund ?? 0;
-      refreshUI();
-    }
+    if (!isLoggedIn || !snap.exists()) return;
+    const d = snap.data();
+    state.employees     = d.employees     ?? [];
+    state.carryoverFund = d.carryoverFund ?? 0;
+    refreshUI();
   });
 
   setSyncState('online');
+}
+
+/**
+ * Migración: convierte el estado 'late' (versión anterior)
+ * al nuevo 'late25' para compatibilidad con datos existentes.
+ */
+function migrateWeekStatus(week) {
+  if (!week?.attendance) return;
+  let changed = false;
+  Object.values(week.attendance).forEach(days => {
+    Object.keys(days).forEach(dayIdx => {
+      if (days[dayIdx] === 'late') { days[dayIdx] = 'late25'; changed = true; }
+    });
+  });
+  if (changed) saveCurrentWeekDebounced();
 }
 
 async function loadHistory() {
@@ -356,12 +368,9 @@ async function saveHistoryEntry(week) {
   } catch (e) { console.error('saveHistory:', e); }
 }
 
-/* ══════════════════════════════════════════════
-   ╔═══════════════════╗
-   ║  SEMANA · FECHA   ║
-   ╚═══════════════════╝
-══════════════════════════════════════════════ */
-
+/* ══════════════════════════════════════════
+   WEEK FACTORY
+══════════════════════════════════════════ */
 function createWeek(startDate = null) {
   const now   = startDate ? new Date(startDate) : new Date();
   const id    = `week_${Date.now()}`;
@@ -376,15 +385,7 @@ function createWeek(startDate = null) {
   const tips = {};
   DAYS.forEach((_, i) => { tips[i] = 0; });
 
-  return {
-    id,
-    label,
-    startDate: now.toISOString(),
-    status: 'open',
-    attendance,
-    tips,
-    results: null,
-  };
+  return { id, label, startDate: now.toISOString(), status: 'open', attendance, tips, results: null };
 }
 
 function formatWeekLabel(date) {
@@ -398,22 +399,19 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
 }
 
-/** Abre modal para editar la fecha de inicio de la semana actual */
+/* ══════════════════════════════════════════
+   WEEK DATE EDITOR
+══════════════════════════════════════════ */
 function openWeekDateModal() {
   const week = state.currentWeek;
-  if (!week || week.status === 'closed') {
-    toast('No se puede editar una semana cerrada');
-    return;
-  }
+  if (!week || week.status === 'closed') { toast('No se puede editar una semana cerrada'); return; }
 
-  // Precarga la fecha actual en el input
-  const current  = new Date(week.startDate);
-  const yyyy     = current.getFullYear();
-  const mm       = String(current.getMonth() + 1).padStart(2, '0');
-  const dd       = String(current.getDate()).padStart(2, '0');
-  const input    = document.getElementById('week-date-input');
-  input.value    = `${yyyy}-${mm}-${dd}`;
-
+  const d    = new Date(week.startDate);
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getDate()).padStart(2, '0');
+  const input = document.getElementById('week-date-input');
+  input.value = `${yyyy}-${mm}-${dd}`;
   updateDatePreview(input.value);
   openModal('modal-week-date');
 }
@@ -421,11 +419,9 @@ function openWeekDateModal() {
 function updateDatePreview(val) {
   const preview = document.getElementById('date-preview');
   if (!val) { preview.classList.remove('visible'); return; }
-
-  const start = new Date(val + 'T12:00:00'); // noon to avoid timezone shifts
+  const start = new Date(val + 'T12:00:00');
   const end   = new Date(start);
   end.setDate(start.getDate() + 6);
-
   preview.textContent = `📅  ${fmtDate(start)} → ${fmtDate(end)}`;
   preview.classList.add('visible');
 }
@@ -433,27 +429,39 @@ function updateDatePreview(val) {
 async function applyWeekDate() {
   const val = document.getElementById('week-date-input').value;
   if (!val) { toast('Selecciona una fecha'); return; }
-
   const newStart = new Date(val + 'T12:00:00');
   state.currentWeek.startDate = newStart.toISOString();
   state.currentWeek.label     = formatWeekLabel(newStart);
-
   setSyncState('syncing');
   await saveCurrentWeek();
   setSyncState('online');
-
   closeModal('modal-week-date');
   toast('Fecha de semana actualizada');
   refreshUI();
 }
 
-/* ══════════════════════════════════════════════
-   CALCULATIONS
-══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   ╔══════════════════════════════╗
+   ║  CÁLCULOS — 4 niveles       ║
+   ╚══════════════════════════════╝
+
+   Para cada día:
+   1. Se obtiene la propina total del día.
+   2. Se identifica a quienes trabajaron (cualquier estado excepto 'off').
+   3. La propina se divide en partes iguales entre quienes trabajaron.
+   4. A cada parte individual se aplica el descuento según su estado:
+        worked:  −0%
+        late25:  −25%
+        late50:  −50%
+        late100: −100% (pierde toda su parte ese día)
+   5. El monto descontado va al fondo de puntualidad.
+   6. Al cerrar la semana el fondo se reparte entre
+      quienes trabajaron todos sus días sin ningún retardo.
+══════════════════════════════════════════ */
 function calculateWeek(week, employees, carryoverFund) {
-  const perEmployee = {};
+  const per = {};
   employees.forEach(emp => {
-    perEmployee[emp.id] = { id: emp.id, name: emp.name, days: 0, lates: 0, earned: 0, discount: 0, bonus: 0, total: 0 };
+    per[emp.id] = { id: emp.id, name: emp.name, days: 0, lates: 0, earned: 0, discount: 0, bonus: 0, total: 0 };
   });
 
   let fundThisWeek = 0;
@@ -462,48 +470,54 @@ function calculateWeek(week, employees, carryoverFund) {
     const dayTip = Number(week.tips?.[dayIdx]) || 0;
     if (dayTip <= 0) return;
 
+    // Quienes participan ese día (todo excepto 'off')
     const workers = employees.filter(emp => {
-      const s = week.attendance?.[emp.id]?.[dayIdx];
-      return s === STATUS.WORKED || s === STATUS.LATE;
+      const s = week.attendance?.[emp.id]?.[dayIdx] ?? STATUS.WORKED;
+      return s !== STATUS.OFF;
     });
     if (!workers.length) return;
 
-    const share = dayTip / workers.length;
+    const sharePerWorker = dayTip / workers.length;
+
     workers.forEach(emp => {
-      const s = week.attendance[emp.id][dayIdx];
-      perEmployee[emp.id].days += 1;
-      if (s === STATUS.LATE) {
-        perEmployee[emp.id].lates    += 1;
-        const penalty = share * LATE_PENALTY;
-        perEmployee[emp.id].earned   += share - penalty;
-        perEmployee[emp.id].discount += penalty;
-        fundThisWeek += penalty;
+      const s       = week.attendance?.[emp.id]?.[dayIdx] ?? STATUS.WORKED;
+      const penalty = PENALTY[s] ?? 0;
+
+      per[emp.id].days += 1;
+
+      if (penalty > 0) {
+        per[emp.id].lates += 1;
+        const deducted = sharePerWorker * penalty;
+        per[emp.id].earned   += sharePerWorker - deducted;
+        per[emp.id].discount += deducted;
+        fundThisWeek         += deducted;
       } else {
-        perEmployee[emp.id].earned += share;
+        per[emp.id].earned += sharePerWorker;
       }
     });
   });
 
   const totalFund = carryoverFund + fundThisWeek;
-  const eligibles = employees.filter(e => perEmployee[e.id].days > 0 && perEmployee[e.id].lates === 0);
+
+  // Elegibles: trabajaron al menos un día y CERO retardos (cualquier nivel)
+  const eligibles = employees.filter(e => per[e.id].days > 0 && per[e.id].lates === 0);
 
   let newCarryFund = 0;
   if (eligibles.length > 0 && totalFund > 0) {
     const bonusShare = totalFund / eligibles.length;
-    eligibles.forEach(e => { perEmployee[e.id].bonus = bonusShare; });
+    eligibles.forEach(e => { per[e.id].bonus = bonusShare; });
   } else {
-    newCarryFund = totalFund;
+    newCarryFund = totalFund; // nadie elegible → arrastra
   }
 
   let totalTips = 0;
   employees.forEach(e => {
-    const r = perEmployee[e.id];
-    r.total   = r.earned + r.bonus;
-    totalTips += r.earned;
+    per[e.id].total = per[e.id].earned + per[e.id].bonus;
+    totalTips       += per[e.id].earned;
   });
 
   return {
-    perEmployee:  Object.values(perEmployee),
+    perEmployee:  Object.values(per),
     totalTips,
     fundThisWeek,
     totalFund,
@@ -512,31 +526,27 @@ function calculateWeek(week, employees, carryoverFund) {
   };
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    WEEK OPERATIONS
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 async function closeWeek() {
   if (!state.currentWeek || state.currentWeek.status !== 'open') return;
-
   const calc = calculateWeek(state.currentWeek, state.employees, state.carryoverFund);
   state.currentWeek.results = calc;
   state.currentWeek.status  = 'closed';
-
   await saveHistoryEntry(state.currentWeek);
   state.history.unshift(state.currentWeek);
-
   state.carryoverFund = calc.newCarryFund;
   await saveConfig();
-
   const nextDate = new Date(state.currentWeek.startDate);
   nextDate.setDate(nextDate.getDate() + 7);
   state.currentWeek = createWeek(nextDate);
   await saveCurrentWeek();
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    EMPLOYEE OPERATIONS
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 async function addEmployee(name) {
   const id = `emp_${Date.now()}`;
   state.employees.push({ id, name });
@@ -562,9 +572,9 @@ async function deleteEmployee(id) {
   await saveCurrentWeek();
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    NAVIGATION
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function navigate(viewId) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -573,7 +583,6 @@ function navigate(viewId) {
   currentView = viewId;
   renderView(viewId);
 }
-
 function renderView(v) {
   switch (v) {
     case 'dashboard': renderDashboard(); break;
@@ -582,20 +591,18 @@ function renderView(v) {
     case 'config':    renderConfig();    break;
   }
 }
-
 function refreshUI() {
   if (!isLoggedIn) return;
   renderView(currentView);
   updateFondoPill();
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    DASHBOARD
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function renderDashboard() {
   const week = state.currentWeek;
   if (!week) return;
-
   const calc = calculateWeek(week, state.employees, state.carryoverFund);
 
   document.getElementById('dash-week-text').textContent    = week.label;
@@ -609,10 +616,9 @@ function renderDashboard() {
   btn.textContent = week.status === 'closed' ? 'Semana cerrada' : 'Cerrar semana';
   btn.disabled    = week.status === 'closed';
 
-  // Week label button: disable if closed
-  const weekLabelBtn = document.getElementById('dash-week-label');
-  weekLabelBtn.disabled = week.status === 'closed';
-  weekLabelBtn.title    = week.status === 'closed' ? 'Semana cerrada' : 'Cambiar fecha de semana';
+  const wlBtn = document.getElementById('dash-week-label');
+  wlBtn.disabled = week.status === 'closed';
+  wlBtn.title    = week.status === 'closed' ? 'Semana cerrada' : 'Cambiar fecha de semana';
 
   renderSummaryTable(calc);
 }
@@ -620,13 +626,11 @@ function renderDashboard() {
 function renderSummaryTable(calc) {
   const tbody = document.getElementById('summary-tbody');
   const tfoot = document.getElementById('summary-tfoot');
-
   if (!calc?.perEmployee?.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Sin datos aún.</td></tr>';
     tfoot.innerHTML = '';
     return;
   }
-
   tbody.innerHTML = calc.perEmployee.map(r => `
     <tr>
       <td style="font-weight:600;color:var(--text-1)">${esc(r.name)}</td>
@@ -642,19 +646,17 @@ function renderSummaryTable(calc) {
   tfoot.innerHTML = `<tr><td>TOTAL</td><td></td><td></td><td></td><td></td><td></td><td>${fmtMoney(grand)}</td></tr>`;
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    PLANILLA
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function renderPlanilla() {
   const week = state.currentWeek;
   if (!week) return;
-
   const locked = week.status === 'closed';
   document.getElementById('planilla-week-label').textContent = week.label;
   const pill = document.getElementById('planilla-status');
   pill.textContent = locked ? 'Cerrada' : 'Abierta';
   pill.className   = `status-pill${locked ? ' closed' : ''}`;
-
   renderAttendanceTable(week, locked);
   renderTipsGrid(week, locked);
 }
@@ -670,8 +672,8 @@ function renderAttendanceTable(week, locked) {
       const status = week.attendance?.[emp.id]?.[dayIdx] ?? STATUS.WORKED;
       return `<td class="status-cell${locked ? ' locked' : ''}"
                   data-emp="${emp.id}" data-day="${dayIdx}"
-                  title="${DAY_NAMES[dayIdx]} — ${statusLabel(status)}">
-                <div class="status-dot ${status}">${STATUS_ICON[status]}</div>
+                  title="${DAY_NAMES[dayIdx]} — ${STATUS_LABEL[status] ?? status}">
+                <div class="status-dot ${status}">${STATUS_ICON[status] ?? '?'}</div>
               </td>`;
     }).join('');
     return `<tr><td class="emp-name">${esc(emp.name)}</td>${cells}</tr>`;
@@ -686,12 +688,17 @@ function renderAttendanceTable(week, locked) {
   }
 }
 
+/**
+ * Avanza al siguiente estado en el ciclo:
+ * worked → late25 → late50 → late100 → off → worked
+ */
 function cycleStatus(empId, dayIdx) {
   const week = state.currentWeek;
   if (!week || week.status === 'closed') return;
   if (!week.attendance[empId]) week.attendance[empId] = {};
   const current = week.attendance[empId][dayIdx] ?? STATUS.WORKED;
-  week.attendance[empId][dayIdx] = STATUS_NEXT[current];
+  const idx     = STATUS_CYCLE.indexOf(current);
+  week.attendance[empId][dayIdx] = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
   saveCurrentWeekDebounced();
   renderPlanilla();
   updateFondoPill();
@@ -719,10 +726,6 @@ function renderTipsGrid(week, locked) {
   }
 }
 
-function statusLabel(s) {
-  return { worked: 'Trabajó', late: 'Retardo', off: 'Descanso' }[s] || s;
-}
-
 function updateFondoPill() {
   if (!state.currentWeek) return;
   const calc = calculateWeek(state.currentWeek, state.employees, state.carryoverFund);
@@ -730,9 +733,9 @@ function updateFondoPill() {
   document.getElementById('kpi-fondo').textContent    = fmtMoney(calc.totalFund);
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    HISTORIAL
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function renderHistorial() {
   const list = document.getElementById('history-list');
   if (!state.history.length) {
@@ -749,7 +752,6 @@ function renderHistorial() {
       <div class="history-card-amount">${fmtMoney(total)}</div>
     </div>`;
   }).join('');
-
   list.querySelectorAll('.history-card').forEach(card => {
     card.addEventListener('click', () => openHistoryModal(card.dataset.weekId));
   });
@@ -758,7 +760,6 @@ function renderHistorial() {
 function openHistoryModal(weekId) {
   const week = state.history.find(w => w.id === weekId);
   if (!week?.results) return;
-
   document.getElementById('modal-history-title').textContent = week.label;
   const calc  = week.results;
   const grand = calc.perEmployee?.reduce((s, r) => s + r.total, 0) ?? 0;
@@ -787,19 +788,15 @@ function openHistoryModal(weekId) {
         <tfoot><tr><td>TOTAL</td><td></td><td></td><td></td><td></td><td></td><td>${fmtMoney(grand)}</td></tr></tfoot>
       </table>
     </div>`;
-
   openModal('modal-history');
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    CONFIGURACIÓN
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function renderConfig() {
   const list = document.getElementById('emp-list');
-  if (!state.employees.length) {
-    list.innerHTML = '<div class="empty-state">No hay empleados.</div>';
-    return;
-  }
+  if (!state.employees.length) { list.innerHTML = '<div class="empty-state">No hay empleados.</div>'; return; }
   list.innerHTML = state.employees.map(emp => `
     <div class="emp-row">
       <div class="emp-row-name">${esc(emp.name)}</div>
@@ -819,7 +816,6 @@ function renderConfig() {
       openModal('modal-emp');
     });
   });
-
   list.querySelectorAll('[data-del]').forEach(btn => {
     btn.addEventListener('click', () => {
       const emp = state.employees.find(e => e.id === btn.dataset.del);
@@ -831,21 +827,17 @@ function renderConfig() {
   });
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    CLOSE WEEK MODAL
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function openCloseWeekModal() {
   const week = state.currentWeek;
   if (!week || week.status !== 'open') return;
-
   const calc      = calculateWeek(week, state.employees, state.carryoverFund);
-  const eligNames = calc.eligibles
-    .map(id => state.employees.find(e => e.id === id)?.name ?? '?')
-    .join(', ');
+  const eligNames = calc.eligibles.map(id => state.employees.find(e => e.id === id)?.name ?? '?').join(', ');
 
   let preview = `Total propinas: <strong>${fmtMoney(calc.totalTips)}</strong><br>
 Fondo de puntualidad: <strong>${fmtMoney(calc.totalFund)}</strong><br>`;
-
   preview += calc.eligibles.length > 0
     ? `Bono para: <strong>${esc(eligNames)}</strong><br>Cada uno recibe: <strong>${fmtMoney(calc.totalFund / calc.eligibles.length)}</strong>`
     : `<span style="color:var(--yellow)">⚠ Nadie elegible — el fondo pasa a la siguiente semana.</span>`;
@@ -854,30 +846,27 @@ Fondo de puntualidad: <strong>${fmtMoney(calc.totalFund)}</strong><br>`;
   openModal('modal-close-week');
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    MODALS
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    EXPORT
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function exportCSV() {
   const week = state.currentWeek;
   const calc = calculateWeek(week, state.employees, state.carryoverFund);
   const rows = [
-    ['Empleado','Días trabajados','Retardos','Ganado','Descuento','Bono','Total'],
+    ['Empleado','Días','Retardos','Ganado','Descuento','Bono','Total'],
     ...calc.perEmployee.map(r => [
       r.name, r.days, r.lates,
-      r.earned.toFixed(2), r.discount.toFixed(2),
-      r.bonus.toFixed(2),  r.total.toFixed(2),
+      r.earned.toFixed(2), r.discount.toFixed(2), r.bonus.toFixed(2), r.total.toFixed(2),
     ]),
   ];
-  const blob = new Blob(
-    [rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')],
-    { type: 'text/csv;charset=utf-8;' }
-  );
+  const blob = new Blob([rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')],
+    { type: 'text/csv;charset=utf-8;' });
   downloadBlob(blob, `${week.label.replace(/[^a-z0-9]/gi, '_')}.csv`);
   toast('CSV exportado');
 }
@@ -891,15 +880,13 @@ function exportBackup() {
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob);
   const a   = Object.assign(document.createElement('a'), { href: url, download: name });
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    TOAST
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 let toastTimer = null;
 function toast(msg, dur = 2800) {
   const el = document.getElementById('toast');
@@ -909,72 +896,56 @@ function toast(msg, dur = 2800) {
   toastTimer = setTimeout(() => el.classList.remove('show'), dur);
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    UTILS
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function fmtMoney(n) {
   if (n == null || isNaN(n)) return '$0.00';
   return '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
 function esc(str) {
-  return String(str)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    MOBILE SIDEBAR
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function initMobileNav() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
-
-  const openSidebar  = () => { sidebar.classList.add('open'); overlay.classList.add('open'); };
-  const closeSidebar = () => { sidebar.classList.remove('open'); overlay.classList.remove('open'); };
-
-  document.getElementById('menuBtn').addEventListener('click', openSidebar);
-  document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
-  overlay.addEventListener('click', closeSidebar);
-
+  const open    = () => { sidebar.classList.add('open');    overlay.classList.add('open'); };
+  const close   = () => { sidebar.classList.remove('open'); overlay.classList.remove('open'); };
+  document.getElementById('menuBtn').addEventListener('click', open);
+  document.getElementById('sidebar-close').addEventListener('click', close);
+  overlay.addEventListener('click', close);
   document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      if (window.innerWidth <= 768) closeSidebar();
-    });
+    item.addEventListener('click', () => { if (window.innerWidth <= 768) close(); });
   });
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    EVENT BINDINGS
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function bindEvents() {
-  /* ─ Login ─ */
+  /* Login */
   document.getElementById('btn-login').addEventListener('click', doLogin);
-  document.getElementById('login-pass').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doLogin();
-  });
-  document.getElementById('login-user').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('login-pass').focus();
-  });
-
-  // Toggle password visibility
+  document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('login-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
   document.getElementById('pass-toggle').addEventListener('click', () => {
-    const input = document.getElementById('login-pass');
-    input.type  = input.type === 'password' ? 'text' : 'password';
+    const inp = document.getElementById('login-pass');
+    inp.type  = inp.type === 'password' ? 'text' : 'password';
   });
 
-  /* ─ Logout ─ */
+  /* Logout */
   document.getElementById('btn-logout').addEventListener('click', doLogout);
 
-  /* ─ Navigation ─ */
+  /* Navigation */
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => navigate(item.dataset.view));
   });
 
-  /* ─ Dashboard ─ */
+  /* Dashboard */
   document.getElementById('btn-close-week').addEventListener('click', openCloseWeekModal);
-
-  // Click on week label → edit date
   document.getElementById('dash-week-label').addEventListener('click', openWeekDateModal);
 
   document.getElementById('btn-confirm-close').addEventListener('click', async () => {
@@ -987,13 +958,11 @@ function bindEvents() {
     navigate('dashboard');
   });
 
-  /* ─ Week Date Modal ─ */
-  document.getElementById('week-date-input').addEventListener('input', e => {
-    updateDatePreview(e.target.value);
-  });
+  /* Week date */
+  document.getElementById('week-date-input').addEventListener('input', e => updateDatePreview(e.target.value));
   document.getElementById('btn-save-week-date').addEventListener('click', applyWeekDate);
 
-  /* ─ Add / Edit Employee ─ */
+  /* Add/Edit employee */
   document.getElementById('btn-add-emp').addEventListener('click', () => {
     editingEmpId = null;
     document.getElementById('modal-emp-title').textContent = 'Agregar empleado';
@@ -1001,7 +970,6 @@ function bindEvents() {
     openModal('modal-emp');
     setTimeout(() => document.getElementById('emp-name-input').focus(), 300);
   });
-
   document.getElementById('btn-save-emp').addEventListener('click', async () => {
     const name = document.getElementById('emp-name-input').value.trim();
     if (!name) { toast('Escribe un nombre'); return; }
@@ -1014,12 +982,11 @@ function bindEvents() {
     renderConfig();
     updateFondoPill();
   });
-
   document.getElementById('emp-name-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('btn-save-emp').click();
   });
 
-  /* ─ Delete Employee ─ */
+  /* Delete employee */
   document.getElementById('btn-confirm-del-emp').addEventListener('click', async () => {
     if (!deletingEmpId) return;
     const name = state.employees.find(e => e.id === deletingEmpId)?.name ?? '';
@@ -1033,21 +1000,20 @@ function bindEvents() {
     updateFondoPill();
   });
 
-  /* ─ Change Password ─ */
+  /* Change password */
   document.getElementById('btn-change-pass').addEventListener('click', () => {
-    document.getElementById('old-pass-input').value  = '';
-    document.getElementById('new-pass-input').value  = '';
-    document.getElementById('new-pass-confirm').value = '';
+    ['old-pass-input','new-pass-input','new-pass-confirm'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
     document.getElementById('change-pass-error').classList.remove('visible');
     openModal('modal-change-pass');
   });
   document.getElementById('btn-confirm-change-pass').addEventListener('click', doChangePassword);
 
-  /* ─ Export / Reset ─ */
+  /* Export / Reset */
   document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
   document.getElementById('btn-print').addEventListener('click', () => window.print());
   document.getElementById('btn-export-backup').addEventListener('click', exportBackup);
-
   document.getElementById('btn-reset').addEventListener('click', async () => {
     if (!confirm('¿Restaurar todos los datos? Esta acción es irreversible.')) return;
     setSyncState('syncing');
@@ -1062,7 +1028,7 @@ function bindEvents() {
     toast('Datos restaurados');
   });
 
-  /* ─ Modal close buttons ─ */
+  /* Modal close */
   document.querySelectorAll('[data-modal]').forEach(btn => {
     btn.addEventListener('click', () => closeModal(btn.dataset.modal));
   });
@@ -1074,18 +1040,18 @@ function bindEvents() {
       document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
   });
 
-  /* ─ Connection status ─ */
+  /* Connectivity */
   window.addEventListener('online',  () => setSyncState('online'));
   window.addEventListener('offline', () => setSyncState('offline'));
 }
 
-/* ══════════════════════════════════════════════
+/* ══════════════════════════════════════════
    INIT
-══════════════════════════════════════════════ */
+══════════════════════════════════════════ */
 function init() {
   bindEvents();
   initMobileNav();
-  initAuth(); // Decide: mostrar login o cargar app
+  initAuth();
 }
 
 init();
