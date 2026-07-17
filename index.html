@@ -34,27 +34,23 @@
         <h1 class="login-title">CocinaApp</h1>
         <p class="login-sub">Gestión de propinas y asistencias</p>
       </div>
-
       <div class="login-body">
         <div class="login-error" id="login-error"></div>
-
         <label class="field-label">Usuario</label>
         <input type="text" class="field-input" id="login-user"
                placeholder="usuario" autocomplete="username"
                autocapitalize="none" spellcheck="false" />
-
         <label class="field-label" style="margin-top:16px">Contraseña</label>
         <div class="password-wrap">
           <input type="password" class="field-input" id="login-pass"
                  placeholder="••••••••" autocomplete="current-password" />
-          <button class="pass-toggle" id="pass-toggle" type="button" aria-label="Mostrar contraseña">
+          <button class="pass-toggle" id="pass-toggle" type="button">
             <svg id="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
           </button>
         </div>
-
         <button class="btn-primary login-btn" id="btn-login">Entrar</button>
       </div>
     </div>
@@ -70,9 +66,8 @@
       <div class="sidebar-header">
         <div class="app-icon">🍽️</div>
         <div class="app-name">CocinaApp</div>
-        <button class="sidebar-close" id="sidebar-close" aria-label="Cerrar menú">✕</button>
+        <button class="sidebar-close" id="sidebar-close">✕</button>
       </div>
-
       <ul class="nav-list">
         <li class="nav-item active" data-view="dashboard">
           <span class="nav-icon">
@@ -99,7 +94,6 @@
           <span class="nav-label">Configuración</span>
         </li>
       </ul>
-
       <div class="sidebar-footer">
         <div class="week-badge" id="sidebar-week-badge">Semana activa</div>
         <div class="sync-indicator" id="sync-indicator">
@@ -113,12 +107,11 @@
       </div>
     </nav>
 
-    <!-- SIDEBAR OVERLAY -->
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
     <!-- MOBILE TOPBAR -->
     <header class="topbar">
-      <button class="menu-btn" id="menuBtn" aria-label="Abrir menú">
+      <button class="menu-btn" id="menuBtn">
         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
       </button>
       <span class="topbar-title">CocinaApp</span>
@@ -135,7 +128,7 @@
             <h1 class="page-title">Dashboard</h1>
             <button class="week-label-btn" id="dash-week-label">
               <span id="dash-week-text">Semana actual</span>
-              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 5a.5.5 0 000 1h7a.5.5 0 000-1h-7zm-1 3a.5.5 0 000 1h9a.5.5 0 000-1h-9zm1 3a.5.5 0 000 1h7a.5.5 0 000-1h-7z"/></svg>
+              <svg viewBox="0 0 16 16" fill="currentColor"><path d="M12.854 4.854a.5.5 0 00-.708-.708L8 8.293 3.854 4.146a.5.5 0 10-.708.708l4.5 4.5a.5.5 0 00.708 0l4.5-4.5z"/></svg>
             </button>
           </div>
           <button class="btn-primary" id="btn-close-week">Cerrar semana</button>
@@ -202,13 +195,47 @@
           <div class="status-pill" id="planilla-status">Abierta</div>
         </div>
 
+        <!-- Leyenda de estados -->
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Asistencia</h2>
-            <div class="legend">
-              <span class="legend-dot green"></span><span class="legend-text">Trabajó</span>
-              <span class="legend-dot yellow"></span><span class="legend-text">Retardo</span>
-              <span class="legend-dot dark"></span><span class="legend-text">Descanso</span>
+          </div>
+          <!-- Leyenda expandida -->
+          <div class="legend-bar">
+            <div class="legend-item">
+              <div class="status-dot worked sm">✓</div>
+              <div class="legend-desc">
+                <span class="legend-name">Trabajó</span>
+                <span class="legend-pct">Sin descuento</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="status-dot late25 sm">!</div>
+              <div class="legend-desc">
+                <span class="legend-name">+10 min</span>
+                <span class="legend-pct">−25%</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="status-dot late50 sm">!!</div>
+              <div class="legend-desc">
+                <span class="legend-name">+30 min</span>
+                <span class="legend-pct">−50%</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="status-dot late100 sm">✗</div>
+              <div class="legend-desc">
+                <span class="legend-name">+60 min</span>
+                <span class="legend-pct">−100%</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="status-dot off sm">—</div>
+              <div class="legend-desc">
+                <span class="legend-name">Descanso</span>
+                <span class="legend-pct">No participa</span>
+              </div>
             </div>
           </div>
           <div class="table-wrap">
@@ -242,7 +269,6 @@
         <div class="page-header">
           <h1 class="page-title">Configuración</h1>
         </div>
-
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Empleados</h2>
@@ -250,7 +276,6 @@
           </div>
           <div class="emp-list" id="emp-list"></div>
         </div>
-
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Cuenta</h2>
@@ -270,7 +295,7 @@
        MODALS
   ══════════════════════════════════════ -->
 
-  <!-- Modal: Add/Edit Employee -->
+  <!-- Add/Edit Employee -->
   <div class="modal-overlay" id="modal-emp">
     <div class="modal">
       <div class="modal-header">
@@ -288,7 +313,7 @@
     </div>
   </div>
 
-  <!-- Modal: Delete Employee -->
+  <!-- Delete Employee -->
   <div class="modal-overlay" id="modal-del-emp">
     <div class="modal">
       <div class="modal-header">
@@ -306,7 +331,7 @@
     </div>
   </div>
 
-  <!-- Modal: Close Week -->
+  <!-- Close Week -->
   <div class="modal-overlay" id="modal-close-week">
     <div class="modal">
       <div class="modal-header">
@@ -324,7 +349,7 @@
     </div>
   </div>
 
-  <!-- Modal: Edit Week Date -->
+  <!-- Edit Week Date -->
   <div class="modal-overlay" id="modal-week-date">
     <div class="modal">
       <div class="modal-header">
@@ -332,8 +357,8 @@
         <button class="modal-close" data-modal="modal-week-date">✕</button>
       </div>
       <div class="modal-body">
-        <p class="modal-text">Selecciona el lunes de inicio de esta semana. Los 7 días se calcularán automáticamente.</p>
-        <label class="field-label" style="margin-top:16px">Fecha de inicio</label>
+        <p class="modal-text">Selecciona el día de inicio de esta semana.</p>
+        <label class="field-label" style="margin-top:14px">Fecha de inicio</label>
         <input type="date" class="field-input" id="week-date-input" />
         <div class="date-preview" id="date-preview"></div>
       </div>
@@ -344,7 +369,7 @@
     </div>
   </div>
 
-  <!-- Modal: History Detail -->
+  <!-- History Detail -->
   <div class="modal-overlay" id="modal-history">
     <div class="modal modal-wide">
       <div class="modal-header">
@@ -358,7 +383,7 @@
     </div>
   </div>
 
-  <!-- Modal: Change Password -->
+  <!-- Change Password -->
   <div class="modal-overlay" id="modal-change-pass">
     <div class="modal">
       <div class="modal-header">
@@ -370,7 +395,7 @@
         <input type="password" class="field-input" id="old-pass-input" placeholder="••••••••" />
         <label class="field-label" style="margin-top:14px">Nueva contraseña</label>
         <input type="password" class="field-input" id="new-pass-input" placeholder="Mínimo 6 caracteres" />
-        <label class="field-label" style="margin-top:14px">Confirmar nueva contraseña</label>
+        <label class="field-label" style="margin-top:14px">Confirmar</label>
         <input type="password" class="field-input" id="new-pass-confirm" placeholder="Repetir contraseña" />
         <div class="login-error" id="change-pass-error" style="margin-top:12px"></div>
       </div>
@@ -381,9 +406,7 @@
     </div>
   </div>
 
-  <!-- Toast -->
   <div class="toast" id="toast"></div>
-
   <script type="module" src="script.js"></script>
 </body>
 </html>
