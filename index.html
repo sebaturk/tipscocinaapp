@@ -12,9 +12,7 @@
 </head>
 <body>
 
-  <!-- ══════════════════════════════════════
-       LOADING SCREEN
-  ══════════════════════════════════════ -->
+  <!-- LOADING -->
   <div class="loading-screen" id="loading-screen">
     <div class="loading-inner">
       <div class="app-icon-lg">🍽️</div>
@@ -24,9 +22,7 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════
-       LOGIN SCREEN
-  ══════════════════════════════════════ -->
+  <!-- LOGIN -->
   <div class="login-screen" id="login-screen">
     <div class="login-card">
       <div class="login-header">
@@ -45,7 +41,7 @@
           <input type="password" class="field-input" id="login-pass"
                  placeholder="••••••••" autocomplete="current-password" />
           <button class="pass-toggle" id="pass-toggle" type="button">
-            <svg id="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
@@ -56,9 +52,7 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════
-       APP SHELL
-  ══════════════════════════════════════ -->
+  <!-- APP SHELL -->
   <div class="app-shell" id="app-shell">
 
     <!-- SIDEBAR -->
@@ -96,7 +90,7 @@
       </ul>
       <div class="sidebar-footer">
         <div class="week-badge" id="sidebar-week-badge">Semana activa</div>
-        <div class="sync-indicator" id="sync-indicator">
+        <div class="sync-indicator">
           <span class="sync-dot"></span>
           <span class="sync-label">En línea</span>
         </div>
@@ -109,7 +103,7 @@
 
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-    <!-- MOBILE TOPBAR -->
+    <!-- TOPBAR MOBILE -->
     <header class="topbar">
       <button class="menu-btn" id="menuBtn">
         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
@@ -118,7 +112,6 @@
       <div class="fondo-pill" id="topbar-fondo">Fondo $0</div>
     </header>
 
-    <!-- MAIN CONTENT -->
     <main class="main-content">
 
       <!-- ═══ DASHBOARD ═══ -->
@@ -134,13 +127,30 @@
           <button class="btn-primary" id="btn-close-week">Cerrar semana</button>
         </div>
 
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-label">Propinas semana</div>
-            <div class="kpi-value" id="kpi-tips">$0.00</div>
-            <div class="kpi-sub">acumulado</div>
-          </div>
+        <!-- KPI Row 1: propinas -->
+        <div class="kpi-section-label">Propinas de la semana</div>
+        <div class="kpi-grid kpi-grid-3">
           <div class="kpi-card accent">
+            <div class="kpi-label">Total acumulado</div>
+            <div class="kpi-value" id="kpi-tips-gross">$0.00</div>
+            <div class="kpi-sub">suma de propinas ingresadas</div>
+          </div>
+          <div class="kpi-card green">
+            <div class="kpi-label">Neto distribuido</div>
+            <div class="kpi-value" id="kpi-tips-net">$0.00</div>
+            <div class="kpi-sub">descontadas las penalizaciones</div>
+          </div>
+          <div class="kpi-card orange">
+            <div class="kpi-label">Total descuentos</div>
+            <div class="kpi-value" id="kpi-tips-disc">$0.00</div>
+            <div class="kpi-sub">al fondo de puntualidad</div>
+          </div>
+        </div>
+
+        <!-- KPI Row 2: operativos -->
+        <div class="kpi-section-label" style="margin-top:6px">Estado operativo</div>
+        <div class="kpi-grid kpi-grid-4">
+          <div class="kpi-card">
             <div class="kpi-label">Fondo puntualidad</div>
             <div class="kpi-value" id="kpi-fondo">$0.00</div>
             <div class="kpi-sub">pendiente de reparto</div>
@@ -155,8 +165,14 @@
             <div class="kpi-value" id="kpi-elegibles">0</div>
             <div class="kpi-sub">sin retardos</div>
           </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Estado semana</div>
+            <div class="kpi-value kpi-status" id="kpi-status">Abierta</div>
+            <div class="kpi-sub" id="kpi-status-sub">en curso</div>
+          </div>
         </div>
 
+        <!-- Summary table -->
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Resumen semanal</h2>
@@ -194,48 +210,30 @@
           </div>
           <div class="status-pill" id="planilla-status">Abierta</div>
         </div>
-
-        <!-- Leyenda de estados -->
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Asistencia</h2>
           </div>
-          <!-- Leyenda expandida -->
           <div class="legend-bar">
             <div class="legend-item">
               <div class="status-dot worked sm">✓</div>
-              <div class="legend-desc">
-                <span class="legend-name">Trabajó</span>
-                <span class="legend-pct">Sin descuento</span>
-              </div>
+              <div class="legend-desc"><span class="legend-name">Trabajó</span><span class="legend-pct">Sin descuento</span></div>
             </div>
             <div class="legend-item">
               <div class="status-dot late25 sm">!</div>
-              <div class="legend-desc">
-                <span class="legend-name">+10 min</span>
-                <span class="legend-pct">−25%</span>
-              </div>
+              <div class="legend-desc"><span class="legend-name">+10 min</span><span class="legend-pct">−25%</span></div>
             </div>
             <div class="legend-item">
               <div class="status-dot late50 sm">!!</div>
-              <div class="legend-desc">
-                <span class="legend-name">+30 min</span>
-                <span class="legend-pct">−50%</span>
-              </div>
+              <div class="legend-desc"><span class="legend-name">+30 min</span><span class="legend-pct">−50%</span></div>
             </div>
             <div class="legend-item">
               <div class="status-dot late100 sm">✗</div>
-              <div class="legend-desc">
-                <span class="legend-name">+60 min</span>
-                <span class="legend-pct">−100%</span>
-              </div>
+              <div class="legend-desc"><span class="legend-name">+60 min</span><span class="legend-pct">−100%</span></div>
             </div>
             <div class="legend-item">
               <div class="status-dot off sm">—</div>
-              <div class="legend-desc">
-                <span class="legend-name">Descanso</span>
-                <span class="legend-pct">No participa</span>
-              </div>
+              <div class="legend-desc"><span class="legend-name">Descanso</span><span class="legend-pct">No participa</span></div>
             </div>
           </div>
           <div class="table-wrap">
@@ -245,7 +243,6 @@
             </table>
           </div>
         </div>
-
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Propinas diarias</h2>
@@ -258,6 +255,11 @@
       <section class="view" id="view-historial">
         <div class="page-header">
           <h1 class="page-title">Historial</h1>
+          <div class="header-actions" id="history-header-actions" style="display:none">
+            <button class="btn-danger btn-sm" id="btn-delete-selected">Eliminar seleccionadas</button>
+            <button class="btn-ghost btn-sm" id="btn-cancel-select">Cancelar</button>
+          </div>
+          <button class="btn-ghost btn-sm" id="btn-toggle-select" style="display:none">Seleccionar</button>
         </div>
         <div class="history-list" id="history-list">
           <div class="empty-state">No hay semanas cerradas aún.</div>
@@ -277,9 +279,7 @@
           <div class="emp-list" id="emp-list"></div>
         </div>
         <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Cuenta</h2>
-          </div>
+          <div class="card-header"><h2 class="card-title">Cuenta</h2></div>
           <div class="backup-grid">
             <button class="btn-secondary" id="btn-change-pass">🔑 Cambiar contraseña</button>
             <button class="btn-secondary" id="btn-export-backup">⬇ Exportar respaldo</button>
@@ -289,7 +289,7 @@
       </section>
 
     </main>
-  </div><!-- /app-shell -->
+  </div>
 
   <!-- ══════════════════════════════════════
        MODALS
@@ -379,6 +379,24 @@
       <div class="modal-body" id="modal-history-body"></div>
       <div class="modal-footer">
         <button class="btn-ghost" data-modal="modal-history">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete History -->
+  <div class="modal-overlay" id="modal-del-history">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Eliminar del historial</h3>
+        <button class="modal-close" data-modal="modal-del-history">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text" id="del-history-text">¿Eliminar esta semana del historial?</p>
+        <p class="modal-sub">Esta acción es irreversible. Los datos de propinas y asistencia de esa semana se perderán permanentemente.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-modal="modal-del-history">Cancelar</button>
+        <button class="btn-danger" id="btn-confirm-del-history">Eliminar</button>
       </div>
     </div>
   </div>
