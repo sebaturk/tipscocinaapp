@@ -6,7 +6,7 @@
  * ✦ 4 niveles de retardo (0 / 25 / 50 / 100%)
  * ✦ Login propio · Fecha editable · Firebase
  */
- 
+
 import { initializeApp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
@@ -15,7 +15,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth, signInAnonymously, onAuthStateChanged }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
- 
+
 /* ══════════════════════════════════════════
    FIREBASE CONFIG
 ══════════════════════════════════════════ */
@@ -30,13 +30,13 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db    = getFirestore(fbApp);
 const auth  = getAuth(fbApp);
- 
+
 /* ══════════════════════════════════════════
    CONSTANTES
 ══════════════════════════════════════════ */
 const DAYS      = ['L','M','X','J','V','S','D'];
 const DAY_NAMES = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
- 
+
 const STATUS = { WORKED:'worked', LATE25:'late25', LATE50:'late50', LATE100:'late100', OFF:'off' };
 const STATUS_CYCLE = ['worked','late25','late50','late100','off'];
 const STATUS_ICON  = { worked:'✓', late25:'!', late50:'!!', late100:'✗', off:'—' };
@@ -45,17 +45,17 @@ const STATUS_LABEL = {
   late50:'Tarde +30 min (−50%)', late100:'Tarde +60 min (−100%)', off:'Descanso',
 };
 const PENALTY = { worked:0, late25:0.25, late50:0.50, late100:1.00, off:0 };
- 
+
 /**
  * REGLA DE ELEGIBILIDAD PARA EL BONO:
  * - Mínimo MIN_DAYS_FOR_BONUS días trabajados (sin contar descansos)
  * - Cero retardos de cualquier nivel
  */
 const MIN_DAYS_FOR_BONUS = 6;
- 
+
 const DEFAULT_EMPLOYEES = ['Angy','Alexander','Hugo','Lili','Eider'];
 const SESSION_KEY       = 'cocinaapp_session';
- 
+
 const PATH = {
   auth:        () => doc(db, 'app', 'auth'),
   config:      () => doc(db, 'app', 'config'),
@@ -63,7 +63,7 @@ const PATH = {
   history:     () => collection(db, 'history'),
   historyDoc:  (id) => doc(db, 'history', id),
 };
- 
+
 /* ══════════════════════════════════════════
    STATE
 ══════════════════════════════════════════ */
@@ -75,7 +75,7 @@ let deletingHistoryId = null;
 let viewingHistoryId  = null;
 let saveDebounce      = null;
 let isLoggedIn        = false;
- 
+
 /* ══════════════════════════════════════════
    LOADING / SYNC
 ══════════════════════════════════════════ */
@@ -96,7 +96,7 @@ function setSyncState(s) {
   dot.className   = `sync-dot${s === 'online' ? '' : ' ' + s}`;
   lbl.textContent = s === 'online' ? 'En línea' : s === 'syncing' ? 'Guardando…' : 'Sin conexión';
 }
- 
+
 /* ══════════════════════════════════════════
    AUTH
 ══════════════════════════════════════════ */
@@ -113,13 +113,13 @@ function initAuth() {
     }
   });
 }
- 
+
 function showLoginScreen() {
   document.getElementById('login-screen').classList.add('visible');
   document.getElementById('login-user').focus();
 }
 function hideLoginScreen() { document.getElementById('login-screen').classList.remove('visible'); }
- 
+
 async function doLogin() {
   const user = document.getElementById('login-user').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value;
@@ -143,12 +143,12 @@ async function doLogin() {
   } catch (err) { console.error('Login:', err); showLoginError('Error de conexión.'); }
   btn.textContent = 'Entrar'; btn.disabled = false;
 }
- 
+
 function showLoginError(msg) {
   const el = document.getElementById('login-error');
   el.textContent = msg; el.classList.add('visible');
 }
- 
+
 function doLogout() {
   if (!confirm('¿Cerrar sesión?')) return;
   sessionStorage.removeItem(SESSION_KEY);
@@ -158,7 +158,7 @@ function doLogout() {
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
 }
- 
+
 async function doChangePassword() {
   const oldPass = document.getElementById('old-pass-input').value;
   const newPass = document.getElementById('new-pass-input').value;
@@ -178,7 +178,7 @@ async function doChangePassword() {
     toast('Contraseña actualizada');
   } catch (err) { errEl.textContent = 'Error al actualizar.'; errEl.classList.add('visible'); }
 }
- 
+
 /* ══════════════════════════════════════════
    BOOT
 ══════════════════════════════════════════ */
@@ -192,13 +192,13 @@ async function bootApp() {
   } catch (err) { console.error('Boot:', err); toast('Error cargando datos'); }
   hideLoading();
 }
- 
+
 /* ══════════════════════════════════════════
    FIRESTORE
 ══════════════════════════════════════════ */
 async function initFirestore() {
   setSyncState('syncing');
- 
+
   const cfgSnap = await getDoc(PATH.config());
   if (cfgSnap.exists()) {
     const d = cfgSnap.data();
@@ -209,7 +209,7 @@ async function initFirestore() {
     state.carryoverFund = 0;
     await saveConfig();
   }
- 
+
   const wkSnap = await getDoc(PATH.currentWeek());
   if (wkSnap.exists()) {
     state.currentWeek = wkSnap.data();
@@ -218,9 +218,9 @@ async function initFirestore() {
     state.currentWeek = createWeek();
     await saveCurrentWeek();
   }
- 
+
   await loadHistory();
- 
+
   onSnapshot(PATH.currentWeek(), snap => {
     if (!isLoggedIn || !snap.exists()) return;
     state.currentWeek = snap.data();
@@ -234,10 +234,10 @@ async function initFirestore() {
     state.carryoverFund = d.carryoverFund ?? 0;
     refreshUI();
   });
- 
+
   setSyncState('online');
 }
- 
+
 function migrateWeekStatus(week) {
   if (!week?.attendance) return;
   let changed = false;
@@ -248,7 +248,7 @@ function migrateWeekStatus(week) {
   });
   if (changed) saveCurrentWeekDebounced();
 }
- 
+
 async function loadHistory() {
   try {
     const q    = query(PATH.history(), orderBy('startDate', 'desc'));
@@ -256,7 +256,7 @@ async function loadHistory() {
     state.history = snap.docs.map(d => d.data());
   } catch (e) { console.error('History load:', e); }
 }
- 
+
 async function saveConfig() {
   try { await setDoc(PATH.config(), { employees: state.employees, carryoverFund: state.carryoverFund }); }
   catch (e) { console.error('saveConfig:', e); }
@@ -280,7 +280,7 @@ async function deleteHistoryEntry(weekId) {
     state.history = state.history.filter(w => w.id !== weekId);
   } catch (e) { console.error('deleteHistory:', e); throw e; }
 }
- 
+
 /* ══════════════════════════════════════════
    WEEK FACTORY
 ══════════════════════════════════════════ */
@@ -297,7 +297,7 @@ function createWeek(startDate = null) {
   DAYS.forEach((_, i) => { tips[i] = 0; });
   return { id, label, startDate: now.toISOString(), status: 'open', attendance, tips, results: null };
 }
- 
+
 function formatWeekLabel(date) {
   const d = new Date(date); const end = new Date(d); end.setDate(d.getDate() + 6);
   return `Semana ${fmtDate(d)} – ${fmtDate(end)}`;
@@ -305,7 +305,7 @@ function formatWeekLabel(date) {
 function fmtDate(d) {
   return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
 }
- 
+
 /* ══════════════════════════════════════════
    WEEK DATE EDITOR
 ══════════════════════════════════════════ */
@@ -338,7 +338,7 @@ async function applyWeekDate() {
   toast('Fecha de semana actualizada');
   refreshUI();
 }
- 
+
 /* ══════════════════════════════════════════
    ╔══════════════════════════════════════╗
    ║           CÁLCULOS                  ║
@@ -357,24 +357,24 @@ function calculateWeek(week, employees, carryoverFund) {
       earned: 0, discount: 0, bonus: 0, total: 0,
     };
   });
- 
+
   let fundThisWeek = 0;
   let grossTips    = 0;
- 
+
   DAYS.forEach((_, dayIdx) => {
     const dayTip = Number(week.tips?.[dayIdx]) || 0;
     if (dayTip <= 0) return;
     grossTips += dayTip;
- 
+
     // Participan todos excepto quienes tienen 'off'
     const workers = employees.filter(emp => {
       const s = week.attendance?.[emp.id]?.[dayIdx] ?? STATUS.WORKED;
       return s !== STATUS.OFF;
     });
     if (!workers.length) return;
- 
+
     const share = dayTip / workers.length;
- 
+
     workers.forEach(emp => {
       const s       = week.attendance?.[emp.id]?.[dayIdx] ?? STATUS.WORKED;
       const penalty = PENALTY[s] ?? 0;
@@ -390,9 +390,9 @@ function calculateWeek(week, employees, carryoverFund) {
       }
     });
   });
- 
+
   const totalFund = carryoverFund + fundThisWeek;
- 
+
   /**
    * ELEGIBILIDAD PARA EL BONO
    * Condiciones (ambas deben cumplirse):
@@ -403,7 +403,7 @@ function calculateWeek(week, employees, carryoverFund) {
     per[emp.id].days  >= MIN_DAYS_FOR_BONUS &&
     per[emp.id].lates === 0
   );
- 
+
   let newCarryFund = 0;
   if (eligibles.length > 0 && totalFund > 0) {
     const bonusShare = totalFund / eligibles.length;
@@ -412,13 +412,13 @@ function calculateWeek(week, employees, carryoverFund) {
     // Nadie elegible → el fondo pasa a la siguiente semana
     newCarryFund = totalFund;
   }
- 
+
   let netTips = 0;
   employees.forEach(emp => {
     per[emp.id].total = per[emp.id].earned + per[emp.id].bonus;
     netTips           += per[emp.id].earned;
   });
- 
+
   return {
     perEmployee:  Object.values(per),
     grossTips,
@@ -431,7 +431,7 @@ function calculateWeek(week, employees, carryoverFund) {
     minDaysRequired: MIN_DAYS_FOR_BONUS,  // expuesto para mostrarlo en UI
   };
 }
- 
+
 /* ══════════════════════════════════════════
    WEEK OPERATIONS
 ══════════════════════════════════════════ */
@@ -449,7 +449,7 @@ async function closeWeek() {
   state.currentWeek = createWeek(nextDate);
   await saveCurrentWeek();
 }
- 
+
 /* ══════════════════════════════════════════
    EMPLOYEE OPERATIONS
 ══════════════════════════════════════════ */
@@ -475,7 +475,7 @@ async function deleteEmployee(id) {
   await saveConfig();
   await saveCurrentWeek();
 }
- 
+
 /* ══════════════════════════════════════════
    NAVIGATION
 ══════════════════════════════════════════ */
@@ -500,7 +500,7 @@ function refreshUI() {
   renderView(currentView);
   updateFondoPill();
 }
- 
+
 /* ══════════════════════════════════════════
    DASHBOARD
 ══════════════════════════════════════════ */
@@ -508,7 +508,7 @@ function renderDashboard() {
   const week = state.currentWeek;
   if (!week) return;
   const calc = calculateWeek(week, state.employees, state.carryoverFund);
- 
+
   document.getElementById('dash-week-text').textContent     = week.label;
   document.getElementById('sidebar-week-badge').textContent = week.label;
   document.getElementById('kpi-gross').textContent          = fmtMoney(calc.grossTips);
@@ -517,35 +517,35 @@ function renderDashboard() {
   document.getElementById('kpi-empleados').textContent      = state.employees.length;
   document.getElementById('kpi-elegibles').textContent      = calc.eligibles.length;
   document.getElementById('kpi-discount').textContent       = fmtMoney(calc.fundThisWeek);
- 
+
   const btn = document.getElementById('btn-close-week');
   btn.textContent = week.status === 'closed' ? 'Semana cerrada' : 'Cerrar semana';
   btn.disabled    = week.status === 'closed';
- 
+
   const wlBtn    = document.getElementById('dash-week-label');
   wlBtn.disabled = week.status === 'closed';
   wlBtn.title    = week.status === 'closed' ? 'Semana cerrada' : 'Cambiar fecha de semana';
- 
+
   renderSummaryTable(calc);
 }
- 
+
 function renderSummaryTable(calc) {
   const tbody = document.getElementById('summary-tbody');
   const tfoot = document.getElementById('summary-tfoot');
- 
+
   if (!calc?.perEmployee?.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Sin datos aún.</td></tr>';
     tfoot.innerHTML = '';
     return;
   }
- 
+
   tbody.innerHTML = calc.perEmployee.map(r => {
     // Muestra por qué alguien no es elegible al bono
     const notEligibleReason =
       r.days < MIN_DAYS_FOR_BONUS && r.lates > 0 ? `${r.days}/7 días · ${r.lates} ret.` :
       r.days < MIN_DAYS_FOR_BONUS                 ? `${r.days}/7 días` :
       r.lates > 0                                 ? `${r.lates} retardo(s)` : '';
- 
+
     return `<tr>
       <td style="font-weight:600;color:var(--text-1)">${esc(r.name)}</td>
       <td class="${r.days < MIN_DAYS_FOR_BONUS ? 'num-negative' : 'num-neutral'}">${r.days}</td>
@@ -556,11 +556,11 @@ function renderSummaryTable(calc) {
       <td style="font-weight:700;color:var(--text-1)">${fmtMoney(r.total)}</td>
     </tr>`;
   }).join('');
- 
+
   const grand = calc.perEmployee.reduce((s, r) => s + r.total, 0);
   tfoot.innerHTML = `<tr><td>TOTAL</td><td></td><td></td><td></td><td></td><td></td><td>${fmtMoney(grand)}</td></tr>`;
 }
- 
+
 /* ══════════════════════════════════════════
    PLANILLA
 ══════════════════════════════════════════ */
@@ -575,13 +575,13 @@ function renderPlanilla() {
   renderAttendanceTable(week, locked);
   renderTipsGrid(week, locked);
 }
- 
+
 function renderAttendanceTable(week, locked) {
   document.getElementById('attendance-head').innerHTML = `<tr>
     <th class="emp-col">Empleado</th>
     ${DAYS.map((d, i) => `<th title="${DAY_NAMES[i]}">${d}</th>`).join('')}
   </tr>`;
- 
+
   document.getElementById('attendance-body').innerHTML = state.employees.map(emp => {
     const cells = DAYS.map((_, dayIdx) => {
       const status = week.attendance?.[emp.id]?.[dayIdx] ?? STATUS.WORKED;
@@ -593,14 +593,14 @@ function renderAttendanceTable(week, locked) {
     }).join('');
     return `<tr><td class="emp-name">${esc(emp.name)}</td>${cells}</tr>`;
   }).join('');
- 
+
   if (!locked) {
     document.querySelectorAll('.status-cell').forEach(cell => {
       cell.addEventListener('click', () => cycleStatus(cell.dataset.emp, parseInt(cell.dataset.day)));
     });
   }
 }
- 
+
 function cycleStatus(empId, dayIdx) {
   const week = state.currentWeek;
   if (!week || week.status === 'closed') return;
@@ -612,7 +612,7 @@ function cycleStatus(empId, dayIdx) {
   renderPlanilla();
   updateFondoPill();
 }
- 
+
 function renderTipsGrid(week, locked) {
   document.getElementById('tips-grid').innerHTML = DAYS.map((_, i) => `
     <div class="tip-cell">
@@ -622,7 +622,7 @@ function renderTipsGrid(week, locked) {
              value="${week.tips?.[i] > 0 ? week.tips[i] : ''}"
              data-day="${i}" ${locked ? 'disabled' : ''} />
     </div>`).join('');
- 
+
   if (!locked) {
     document.querySelectorAll('.tip-input').forEach(input => {
       input.addEventListener('input', () => {
@@ -634,14 +634,14 @@ function renderTipsGrid(week, locked) {
     });
   }
 }
- 
+
 function updateFondoPill() {
   if (!state.currentWeek) return;
   const calc = calculateWeek(state.currentWeek, state.employees, state.carryoverFund);
   document.getElementById('topbar-fondo').textContent = `Fondo ${fmtMoney(calc.totalFund)}`;
   document.getElementById('kpi-fondo').textContent    = fmtMoney(calc.totalFund);
 }
- 
+
 /* ══════════════════════════════════════════
    HISTORIAL
 ══════════════════════════════════════════ */
@@ -665,14 +665,14 @@ function renderHistorial() {
         </div>
       </div>`;
   }).join('');
- 
+
   list.querySelectorAll('.history-card').forEach(card => {
     card.addEventListener('click', e => {
       if (e.target.closest('.history-card-del')) return;
       openHistoryModal(card.dataset.weekId);
     });
   });
- 
+
   list.querySelectorAll('.history-card-del').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -680,7 +680,7 @@ function renderHistorial() {
     });
   });
 }
- 
+
 function promptDeleteHistory(weekId) {
   const week = state.history.find(w => w.id === weekId);
   if (!week) return;
@@ -688,12 +688,12 @@ function promptDeleteHistory(weekId) {
   document.getElementById('del-history-label').textContent = week.label;
   openModal('modal-del-history');
 }
- 
+
 function openHistoryModal(weekId) {
   const week = state.history.find(w => w.id === weekId);
   if (!week?.results) return;
   viewingHistoryId = weekId;
- 
+
   document.getElementById('modal-history-title').textContent = week.label;
   const calc  = week.results;
   const grand = calc.perEmployee?.reduce((s, r) => s + r.total, 0) ?? 0;
@@ -701,7 +701,7 @@ function openHistoryModal(weekId) {
   const gross = calc.grossTips ?? calc.totalTips ?? 0;
   const net   = calc.netTips   ?? calc.totalTips ?? 0;
   const minDays = calc.minDaysRequired ?? MIN_DAYS_FOR_BONUS;
- 
+
   document.getElementById('modal-history-body').innerHTML = `
     <div class="history-detail-grid">
       <div class="hd-kpi"><div class="hd-kpi-label">Propinas brutas</div><div class="hd-kpi-value">${fmtMoney(gross)}</div></div>
@@ -729,10 +729,10 @@ function openHistoryModal(weekId) {
         <tfoot><tr><td>TOTAL</td><td></td><td></td><td></td><td></td><td></td><td>${fmtMoney(grand)}</td></tr></tfoot>
       </table>
     </div>`;
- 
+
   openModal('modal-history');
 }
- 
+
 /* ══════════════════════════════════════════
    CONFIGURACIÓN
 ══════════════════════════════════════════ */
@@ -747,7 +747,7 @@ function renderConfig() {
         <button class="emp-row-btn del" data-del="${emp.id}">Eliminar</button>
       </div>
     </div>`).join('');
- 
+
   list.querySelectorAll('[data-edit]').forEach(btn => {
     btn.addEventListener('click', () => {
       const emp = state.employees.find(e => e.id === btn.dataset.edit);
@@ -768,7 +768,7 @@ function renderConfig() {
     });
   });
 }
- 
+
 /* ══════════════════════════════════════════
    CLOSE WEEK MODAL
 ══════════════════════════════════════════ */
@@ -779,7 +779,7 @@ function openCloseWeekModal() {
   const eligNames = calc.eligibles
     .map(id => state.employees.find(e => e.id === id)?.name ?? '?')
     .join(', ');
- 
+
   // Mostrar quiénes NO califican y por qué
   const notElig = state.employees
     .filter(e => !calc.eligibles.includes(e.id))
@@ -792,32 +792,32 @@ function openCloseWeekModal() {
       return reasons.length ? `${e.name} (${reasons.join(', ')})` : null;
     })
     .filter(Boolean);
- 
+
   let preview = `Propinas brutas: <strong>${fmtMoney(calc.grossTips)}</strong><br>
 Propinas netas: <strong>${fmtMoney(calc.netTips)}</strong><br>
 Fondo de puntualidad: <strong>${fmtMoney(calc.totalFund)}</strong><br>`;
- 
+
   if (calc.eligibles.length > 0) {
     preview += `Bono para: <strong>${esc(eligNames)}</strong><br>
 Cada uno recibe: <strong>${fmtMoney(calc.totalFund / calc.eligibles.length)}</strong>`;
   } else {
     preview += `<span style="color:var(--yellow)">⚠ Nadie elegible — el fondo pasa a la siguiente semana.</span>`;
   }
- 
+
   if (notElig.length) {
     preview += `<br><br><span style="color:var(--text-3);font-size:12px">Sin bono: ${notElig.map(esc).join(' · ')}</span>`;
   }
- 
+
   document.getElementById('close-week-preview').innerHTML = preview;
   openModal('modal-close-week');
 }
- 
+
 /* ══════════════════════════════════════════
    MODALS
 ══════════════════════════════════════════ */
 function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
- 
+
 /* ══════════════════════════════════════════
    EXPORT
 ══════════════════════════════════════════ */
@@ -849,7 +849,7 @@ function downloadBlob(blob, name) {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
- 
+
 /* ══════════════════════════════════════════
    TOAST
 ══════════════════════════════════════════ */
@@ -860,7 +860,7 @@ function toast(msg, dur = 2800) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), dur);
 }
- 
+
 /* ══════════════════════════════════════════
    UTILS
 ══════════════════════════════════════════ */
@@ -873,7 +873,7 @@ function esc(str) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
- 
+
 /* ══════════════════════════════════════════
    MOBILE SIDEBAR
 ══════════════════════════════════════════ */
@@ -889,7 +889,7 @@ function initMobileNav() {
     item.addEventListener('click', () => { if (window.innerWidth <= 768) close(); });
   });
 }
- 
+
 /* ══════════════════════════════════════════
    EVENT BINDINGS
 ══════════════════════════════════════════ */
@@ -902,15 +902,15 @@ function bindEvents() {
     const inp = document.getElementById('login-pass');
     inp.type  = inp.type === 'password' ? 'text' : 'password';
   });
- 
+
   /* Logout */
   document.getElementById('btn-logout').addEventListener('click', doLogout);
- 
+
   /* Navigation */
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => navigate(item.dataset.view));
   });
- 
+
   /* Dashboard */
   document.getElementById('btn-close-week').addEventListener('click', openCloseWeekModal);
   document.getElementById('dash-week-label').addEventListener('click', openWeekDateModal);
@@ -923,11 +923,11 @@ function bindEvents() {
     toast('Semana cerrada correctamente ✓');
     navigate('dashboard');
   });
- 
+
   /* Week date */
   document.getElementById('week-date-input').addEventListener('input', e => updateDatePreview(e.target.value));
   document.getElementById('btn-save-week-date').addEventListener('click', applyWeekDate);
- 
+
   /* Add/Edit employee */
   document.getElementById('btn-add-emp').addEventListener('click', () => {
     editingEmpId = null;
@@ -951,7 +951,7 @@ function bindEvents() {
   document.getElementById('emp-name-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('btn-save-emp').click();
   });
- 
+
   /* Delete employee */
   document.getElementById('btn-confirm-del-emp').addEventListener('click', async () => {
     if (!deletingEmpId) return;
@@ -965,13 +965,13 @@ function bindEvents() {
     renderConfig();
     updateFondoPill();
   });
- 
+
   /* Delete history — botón dentro del modal de detalle */
   document.getElementById('btn-delete-history-entry').addEventListener('click', () => {
     if (!viewingHistoryId) return;
     promptDeleteHistory(viewingHistoryId);
   });
- 
+
   /* Confirm delete history */
   document.getElementById('btn-confirm-del-history').addEventListener('click', async () => {
     if (!deletingHistoryId) return;
@@ -991,7 +991,7 @@ function bindEvents() {
     closeModal('modal-history');
     renderHistorial();
   });
- 
+
   /* Change password */
   document.getElementById('btn-change-pass').addEventListener('click', () => {
     ['old-pass-input','new-pass-input','new-pass-confirm'].forEach(id => { document.getElementById(id).value = ''; });
@@ -999,7 +999,7 @@ function bindEvents() {
     openModal('modal-change-pass');
   });
   document.getElementById('btn-confirm-change-pass').addEventListener('click', doChangePassword);
- 
+
   /* Export / Reset */
   document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
   document.getElementById('btn-print').addEventListener('click', () => window.print());
@@ -1017,7 +1017,7 @@ function bindEvents() {
     navigate('dashboard');
     toast('Datos restaurados');
   });
- 
+
   /* Modal close (genérico) */
   document.querySelectorAll('[data-modal]').forEach(btn => {
     btn.addEventListener('click', () => closeModal(btn.dataset.modal));
@@ -1029,12 +1029,12 @@ function bindEvents() {
     if (e.key === 'Escape')
       document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
   });
- 
+
   /* Connectivity */
   window.addEventListener('online',  () => setSyncState('online'));
   window.addEventListener('offline', () => setSyncState('offline'));
 }
- 
+
 /* ══════════════════════════════════════════
    INIT
 ══════════════════════════════════════════ */
@@ -1043,5 +1043,5 @@ function init() {
   initMobileNav();
   initAuth();
 }
- 
+
 init();
